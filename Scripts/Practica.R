@@ -277,9 +277,8 @@ aic.modelos #notar quien esta ultimo y los df (parametros estimados)
 #ahora anova pero ordenado:
 lista.modelos <- mget(rownames(aic.modelos))
 
-with(lista.modelos,
-     do.call(anova, 
-             lapply(names(lista.modelos), as.name)))
+do.call(anova, 
+        lapply(names(lista.modelos), as.name))
 
 #Los primeros son diferentes? Con cual nos quedamos?
 
