@@ -45,7 +45,7 @@ tidy.modelo.inicial %>%
   geom_hline(size = 1, colour = "black", yintercept = 0, linetype = "dashed", alpha = 0.3) +
   geom_point() +
   geom_smooth(se = FALSE, col = muted("red"), alpha = 0.75) +
-  labs(title = "Residuos vs valores predichos", x = "Predichos", y = "Residuos estandarizados") + 
+  labs(title = "Residuos vs valores predichos", x = "DML", y = "Residuos estandarizados") + 
   theme_bw()
 
 #Aca se ve claro la dependencia de la varianza con esta variable
