@@ -48,7 +48,7 @@ tidy.modelo.inicial %>%
   labs(title = "Residuos vs valores predichos", x = "Predichos", y = "Residuos estandarizados") + 
   theme_bw()
 
-#Aca se ve claro la depenencia de la vairanza con esta variable
+#Aca se ve claro la dependencia de la varianza con esta variable
 
 #Siendo que hay heterocedasticidad, el error estandar del modelo esta mal estimado, y las inferencias tambien, los p-valores no son confiables:
 
