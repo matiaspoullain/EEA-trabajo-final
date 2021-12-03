@@ -12,6 +12,7 @@ library(nlme)
 library(tidymodels)
 library(gridExtra)
 library(broom.mixed)
+library(scales)
 source("Scripts/Funciones utiles.R", encoding = "UTF-8")
 #var1: 200 numero al azar entre 0 y 100
 set.seed(2)
