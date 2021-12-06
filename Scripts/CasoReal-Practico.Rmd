@@ -1,0 +1,176 @@
+---
+title: 'Ejemplo de caso real: Calamares'
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r}
+library(tidyverse)
+library(broom.mixed)
+library(gridExtra)
+library(data.table)
+source("../Scripts/Funciones utiles.R", encoding = "UTF-8")
+```
+
+## Dataset
+##### El dataset y algunos ejemplos fueron tomados del libro “Statistics for Biology and Health”(Gail, Wong) - Capitulo 4. 
+#### Calamares de especie Loligo Forbesi
+#### La idea es ver como ciertas variables (DML, Month) impactan en la maduración sexual del animal
+```{r}
+datos <- fread("../Datos/Squid.txt")
+#datos <- fread("Datos/Squid.txt")
+#Se pasa el mes a factor:
+datos$MONTH <- factor(datos$MONTH, levels = 1:12)
+#Se quitan valores muy bajos del peso:
+datos <- datos[Testisweight >= 2]
+datos
+```
+
+## Un poco de análisis exploratorio
+```{r}
+library(ggplot2)
+library(ggthemes)
+library(ggrepel)
+library(scales)
+
+ggplot(data = datos, aes(x = DML, y=Testisweight)) + 
+  geom_point()
+```
+```{r}
+g <- ggplot(data = datos, aes( x = DML, y = Testisweight, color = MONTH)) +
+  geom_point(alpha = 0.75)
+g
+```
+```{r}
+g <- g +
+  labs(title = "") +
+  theme(legend.position = 'none') +
+  facet_wrap(~ MONTH)
+g
+```
+```{r}
+# calculamos la correlación de Pearson
+cor(datos$DML, datos$Testisweight) 
+```
+
+```{r}
+ggplot(datos, aes(x=MONTH, y=Testisweight, fill= MONTH)) + 
+  geom_boxplot()
+```
+
+Podemos ver que la distribución por mes del peso esta variando, en algunos casos bastante simetricas, mientras que en otras no.
+
+## Análisis de modelos
+### Modelo lineal inicial 
+```{r}
+modelo.inicial <- lm(Testisweight ~ MONTH + DML, data = datos)
+#Chequeo de supuestos
+library(ggplot2)
+library(ggthemes)
+library(ggrepel)
+library(scales)
+gg.plot.modelo(modelo.inicial)
+```
+
+## Modelado de Varianza (usando GLS: Mínimos cuadrados generalizados): 
+#### Modelando la estructura de la varianza del modelo.
+### Sin usar el parametro "weights" (sin usar ninguna función) de la función "gls"
+```{r}
+library(nlme)
+
+modelo.inicial.gls <- gls(Testisweight ~ MONTH + DML, data = datos)
+gg.plot.modelo(modelo.inicial.gls)
+```
+
+### Función VarFixed
+#### La varianza como función lineal de alguna covariable
+```{r}
+modelo.varfixed<- gls(Testisweight ~ MONTH + DML, weights = varFixed(~DML), data = datos)
+#Se compara VarFixed contra modelo original
+gg.plot.comparacion.modelos(modelo.inicial.gls, modelo.varfixed)
+```
+
+### Función VarIdent
+#### Una varianza distinta para cada grupo. La única que admite variables cualitativas como covariable.
+```{r}
+modelo.varident<- gls(Testisweight ~ MONTH + DML, weights = varIdent(form= ~ 1 | MONTH), data = datos)
+#Se compara VarIdent contra modelo original
+gg.plot.comparacion.modelos(modelo.inicial.gls, modelo.varident)
+```
+
+### Función VarPower
+#### La varianza como función de potencia de alguna covariable. No admite que la covariable tome valor cero.
+```{r}
+modelo.varpower<- gls(Testisweight ~ MONTH + DML, weights = varPower(form = ~ DML), data = datos)  
+#Se compara VarPower contra modelo original
+gg.plot.comparacion.modelos(modelo.inicial.gls, modelo.varpower)
+```
+
+### Función varConstPower
+#### Similar a varPower, pero se le suma una constante a la covariable. Admite covariables que tomen variables iguales a cero.
+```{r}
+modelo.varconstpower<- gls(Testisweight ~ MONTH + DML, weights = varConstPower(form = ~ DML), data = datos)
+#Se compara varConstPower contra modelo original
+gg.plot.comparacion.modelos(modelo.inicial.gls, modelo.varconstpower)
+```
+
+### Función varExp
+#### La varianza como función exponencial de alguna variable. 
+```{r}
+modelo.varexp<- gls(Testisweight ~ MONTH + DML, weights = varExp(form = ~ DML), data = datos)
+#Se compara varExp contra modelo original
+gg.plot.comparacion.modelos(modelo.inicial.gls, modelo.varexp)
+```
+
+### Función varComb
+#### Hace una combinación de las anteriores.
+```{r}
+modelo.varcomb<- gls(Testisweight ~ MONTH + DML, weights = varComb(varIdent(form = ~ 1 | MONTH) ,
+                                                                    varExp(form = ~ DML)), data = datos)
+#Se compara varComb contra modelo original
+gg.plot.comparacion.modelos(modelo.inicial.gls, modelo.varcomb)
+```
+
+### Elección del mejor modelo
+####  Para ello usaremos criterio AIC (Criterio de Información de Akaike) 
+####  Seleccionamos el que presente menor AIC.
+
+```{r}
+aic.modelos <- AIC(modelo.inicial.gls,
+                   modelo.varfixed,
+                   modelo.varident,
+                   modelo.varpower,
+                   modelo.varexp,
+                   modelo.varconstpower,
+                   modelo.varcomb) %>%
+  arrange(AIC)
+
+aic.modelos 
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
