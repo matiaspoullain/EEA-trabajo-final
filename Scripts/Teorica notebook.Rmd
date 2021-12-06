@@ -28,7 +28,7 @@ source("../Scripts/Funciones utiles.R", encoding = "UTF-8")
 Primero fabriquemos los datos. Se crearán dos variables:
 
 *var1: Variable explicativa de valores aleatorios uniformes que varían entre 0 y 10
-*target: Variable respuesta que es linealmente dependiente de var1 tal que $E(Y/X)  = 3 + 2.var1$ y $\epsilon_{i} \sim N(0,4^2)$
+*target: Variable respuesta que es linealmente dependiente de var1 tal que $E(Target/var1)  = 3 + 2.var1$ y $\epsilon_{i} \sim N(0,4^2)$
 ```{r}
 #var1: 200 numero al azar entre 0 y 100
 set.seed(2)
@@ -53,7 +53,7 @@ datos %>%
   geom_smooth(method = "lm", se = FALSE)
 ```
 
-Ajustemos el modelo lineal $E(Y/X)  = \beta_{0} + \beta_{1}.var1$ y $\epsilon_{i} \sim N(0,\sigma^2)$ y veamos sus supuestos. Este modelo será llamado "modelo.bien":
+Ajustemos el modelo lineal $E(Target/var1)  = \beta_{0} + \beta_{1}.var1$ y $\epsilon_{i} \sim N(0,\sigma^2)$ y veamos sus supuestos. Este modelo será llamado "modelo.bien":
 
 ```{r}
 modelo.bien <- lm(target ~ var1, data = datos)

@@ -241,3 +241,49 @@ plot.transformado <- datos %>%
   labs(y = "Log(Target)", x = "X1")
 
 ggsave("Imagenes/Teorica/Plot transformado.png", plot.transformado, width = 4, height = 4)
+
+
+#Embudo a lindo:
+
+set.seed(2)
+
+n.datos <- 500
+
+var1 <- runif(n.datos, min = 0, max = 10)
+
+set.seed(2)
+datos$target2 <- 3 + var1 * 2 + rnorm(n.datos, sd =  4 * exp(0.4*var1))
+
+modelo.mal <- lm(target2 ~ var1, data = datos)
+
+modelo.aumentado <- augment(modelo.mal)
+
+if(class(modelo.mal) == "gls"){
+  modelo.aumentado$.std.resid <- residuals(modelo.mal, "normalized")
+}
+
+g1 <- ggplot(modelo.aumentado, aes(.fitted, .std.resid)) +
+  geom_hline(size = 1, colour = "black", yintercept = 0, linetype = "dashed", alpha = 0.3) +
+  geom_point() +
+  geom_smooth(se = FALSE, col = muted("red"), alpha = 0.75) +
+  labs(title = "Residuos vs valores predichos", x = "Predichos", y = "Residuos estandarizados") + 
+  theme_bw()
+
+ggsave("Imagenes/Teorica/Res vs pred modelo mal.png", g1, width = 4, height = 4)
+
+modelo.corregido <- gls(target2 ~ var1, weights = varExp(form = ~ var1), data = datos)
+
+modelo.aumentado <- augment(modelo.corregido)
+
+if(class(modelo.corregido) == "gls"){
+  modelo.aumentado$.std.resid <- residuals(modelo.corregido, "normalized")
+}
+
+g2 <- ggplot(modelo.aumentado, aes(.fitted, .std.resid)) +
+  geom_hline(size = 1, colour = "black", yintercept = 0, linetype = "dashed", alpha = 0.3) +
+  geom_point() +
+  geom_smooth(se = FALSE, col = muted("red"), alpha = 0.75) +
+  labs(title = "Residuos vs valores predichos", x = "Predichos", y = "Residuos estandarizados") + 
+  theme_bw()
+
+ggsave("Imagenes/Teorica/Res vs pred modelo corregido.png", g2, width = 4, height = 4)
