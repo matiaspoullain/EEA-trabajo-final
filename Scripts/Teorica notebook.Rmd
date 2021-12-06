@@ -1,0 +1,196 @@
+---
+title: 'Modelado de varianza: ejemplo de juguete'
+output:
+  html_document:
+    df_print: paged
+---
+
+El objetivo de este ejemplo de juguete es mostrar la potencia del modelado de varianza. En él se fabricarán datos para ajustar un modelo lineal con una marcada heterocedasticidad que será modelada con una función de varianza y se lo compará paso a paso con el modelo lineal equivalente homocedastico.
+
+En primer lugar, carguemos las librerías que vamos a usar:
+
+```{r message=FALSE, warning=FALSE}
+rm(list = ls())
+gc()
+library(tidyverse)
+library(data.table)
+library(nlme)
+#library(tidymodels)
+library(gridExtra)
+library(broom.mixed)
+library(scales)
+source("../Scripts/Funciones utiles.R", encoding = "UTF-8")
+```
+
+
+## 1. Modelo lineal con homocedasticidad
+
+Primero fabriquemos los datos. Se crearán dos variables:
+
+*var1: Variable explicativa de valores aleatorios uniformes que varían entre 0 y 10
+*target: Variable respuesta que es linealmente dependiente de var1 tal que $E(Target/var1)  = 3 + 2.var1$ y $\epsilon_{i} \sim N(0,4^2)$
+```{r}
+#var1: 200 numero al azar entre 0 y 100
+set.seed(2)
+
+n.datos <- 500
+
+var1 <- runif(n.datos, min = 0, max = 10)
+
+#target: depende linealmente de var1: ordenada al origen de 3 y pendiente de 2
+#pero le agregamos un ruido gaussiano de desvio 4 sin variar los parámetros a lo lardo de var1:
+set.seed(2)
+target <- 3 + var1 * 2 + rnorm(n.datos, sd = 4)
+
+datos <- data.table(target, var1)
+
+#Observemos los datos:
+
+datos %>%
+  ggplot(aes(x = var1, y = target)) +
+  geom_point() +
+  theme_bw() +
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+Ajustemos el modelo lineal $E(Target/var1)  = \beta_{0} + \beta_{1}.var1$ y $\epsilon_{i} \sim N(0,\sigma^2)$ y veamos sus supuestos. Este modelo será llamado "modelo.bien":
+
+```{r}
+modelo.bien <- lm(target ~ var1, data = datos)
+gg.plot.modelo(modelo.bien)
+```
+
+Siendo que los modelos se cumplen, se puede confiar en los errores estándar estimados:
+
+```{r}
+summary(modelo.bien)
+```
+
+Podemos observar que las estimaciones son correctas:
+
+* $\hat{\beta_{0}} ≈ 3$ y significativamente distinto de 0
+
+* $\hat{\beta_{1}} ≈ 2$ y significativamente distinto de 0
+
+* $\hat{\sigma} ≈ 4$
+
+Este fue el modelo ideal, ahora realicemos el mismo procedimiento para uno cuyo ajuste presenta una marcada heterocedasticidad:
+
+
+## 2. Modelo lineal con heterocedasticidad
+
+Para construir estos datos, se forzará que el desvió del ruido agregago sea dependiente de la covariable var1 mediante una función exponencial pero manteniendo los parámetros de la relación lineal original:
+
+```{r}
+set.seed(2)
+datos$target2 <- 3 + var1 * 2 + rnorm(n.datos, sd =  4 * exp(0.4*var1))
+
+#Observemos los datos:
+
+datos %>%
+  ggplot(aes(x = var1, y = target2)) +
+  geom_point() +
+  theme_bw() +
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+Ya con este gráfico se puede observar que los residuos no tienen la misma varianza a lo largo de var1, pero ajustemos un modelo lineal y miremos sus supuestos para confirmar. Este modelo será llamado "modelo.mal":
+
+```{r}
+modelo.mal <- lm(target2 ~ var1, data = datos)
+
+gg.plot.modelo(modelo.mal)
+```
+
+Es claro que los supuestos no se cumplen:
+*Residuos vs predichos muestra un embudo muy marcado, indicando que no hay homocedasticidad
+*El QQ-plot muestra una desviación en forma de "S" de los cuantiles muestrales comparados a los teóricos, por lo que tampoco hay normalidad de los residuos
+
+Si bien los errores estándar no son confiables, miremos el summary del modelo para ver que ocurrió:
+
+```{r}
+summary(modelo.mal)
+```
+
+Podemos observar que las estimaciones de los parámetros no son buenas:
+
+* $\hat{\beta_{0}} = -6.722$ cuando $\beta_{0} = 3$
+
+* $\hat{\beta_{1}} = 5.409$ cuando $\beta_{1} = 2$
+
+* $\hat{\sigma} = 84.41$ cuando $\sigma$ no es constante
+
+Comparemos las estimaciones de ambos modelos:
+
+```{r}
+#Comparemos con el modelo anterior:
+lista.modelos <- list(modelo.bien = modelo.bien, modelo.mal = modelo.mal)
+
+df.modelos <- map_df(lista.modelos, tidy, conf.int = TRUE, .id = "modelo")
+
+df.modelos %>%
+ggplot(aes(estimate, modelo, color=p.value < 0.05, xmin = conf.low, xmax = conf.high, height = 0)) +
+  geom_point() +
+  geom_vline(xintercept = 0, lty = 4, color = "black") +
+  geom_errorbarh() +
+  facet_wrap(term~., scales = "free_x") +
+  scale_color_manual(values=c('firebrick', 'forestgreen')) +
+  guides(color="none") +
+  scale_x_continuous(n.breaks = 10) +
+  theme_bw() +
+  labs(y = "Modelos", x = "Estimación", title = "Intervalos de confianza para la estimación de los coeficientes")
+
+```
+
+Los intervalos de confianza son muy distintos entre ambos modelos. Los intervalos de "modelo.bien" contienen a los valores reales. EN el caso de "modelo.mal", solo el intervalo de $\beta_{0}$ contiene el valor real, a fuerza de un intervalo de confianza muy amplio.
+
+Ahora realicemos el mismo procedimiento pero modelando la varianza del "modelo.mal"
+
+## 3. Modelado de varianza
+
+Ajustemos el modelo a un modelo de Mínimos Cuadrados Generalizados (GLS) con función de varianza exponencial (llamado "modelo.corregido") y comparemos los supuestos con el "modelo.mal":
+
+```{r}
+modelo.corregido <- gls(target2 ~ var1, weights = varExp(form = ~ var1), data = datos)
+
+gg.plot.comparacion.modelos(modelo.mal, modelo.corregido)
+```
+
+El cambio es muy grande! Los supuestos ahora parecen están cumplidos!
+
+Observemos el summary:
+
+```{r}
+summary(modelo.corregido)
+```
+
+La estimación de los parámetros poblacionales mejoró mucho:
+
+* $\hat{\beta_{0}} = 3.64$ cuando $\beta_{0} = 3$ y significativamente distinto de 0
+
+* $\hat{\beta_{1}} = 1.93$ cuando $\beta_{1} = 2$ y significativamente distinto de 0
+
+* $\hat{\sigma} = 3,97 . e^{0,41 . var1}$ cuando $\sigma = 4 . e^{0,4 . var1}$ 
+
+Comparemos las estimaciones con los otros modelos:
+```{r}
+lista.modelos <- list(modelo.bien = modelo.bien, modelo.mal = modelo.mal, modelo.corregido = modelo.corregido)
+
+df.modelos <- map_df(lista.modelos, tidy, conf.int = TRUE, .id = "modelo")
+
+df.modelos %>%
+  ggplot(aes(estimate, fct_relevel(modelo, c("modelo.corregido", "modelo.mal", "modelo.bien")), color=p.value < 0.05, xmin = conf.low, xmax = conf.high, height = 0)) +
+  geom_point() +
+  geom_vline(xintercept = 0, lty = 4, color = "black") +
+  geom_errorbarh() +
+  facet_wrap(term~., scales = "free_x") +
+  scale_color_manual(values=c('firebrick', 'forestgreen')) +
+  guides(color="none") +
+  scale_x_continuous(n.breaks = 10) +
+  theme_bw() +
+  labs(y = "Modelos", x = "Estimación", title = "Intervalos de confianza para la estimación de los coeficientes")
+
+
+```
+
+Se puede observar como los intervalos de confianza del "modelo.corregido" son mucho más similares a los del "modelo.bien" y que todos encierran a los parámetros reales
