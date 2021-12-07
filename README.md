@@ -7,3 +7,7 @@ En la carpeta "Datos" se encuentra un CSV con los datos reales de calamares util
 En la carpeta "Imagenes" se encuentras las figuras ejemplo creadas y presentadas en la parte teórica. El script que las crea es "Teorica/Imagenes teorica.R"
 
 Se puede acceder a los videos que conforman la clase por el siguiente link: **PROXIMAMENTE**
+
+Autores: 
+
+Claudia Aguirre, Cristian Soraci, Matías Poullain
